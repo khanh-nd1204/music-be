@@ -8,10 +8,35 @@ import { IUser } from './users.interface';
 import aqp from 'api-query-params';
 import mongoose, { Model } from 'mongoose';
 import { ChangeUserDto } from './dto/change-user.dto';
+import dayjs from 'dayjs';
+import { MailService } from '../mail/mail.service';
+import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class UsersService {
-  constructor(@InjectModel(User.name) private userModel: Model<UserDocument>) {}
+  constructor(
+    @InjectModel(User.name) private userModel: Model<UserDocument>,
+    private mailService: MailService,
+    private configService: ConfigService,
+    ) {}
+
+  private usedOtps = new Set<number>();
+
+  generateUniqueOtp(): number {
+    let otp;
+    do {
+      // Generate a random 6-digit number
+      otp = Math.floor(100000 + Math.random() * 900000);
+    } while (this.usedOtps.has(otp));
+
+    // Store this OTP in the Set
+    this.usedOtps.add(otp);
+
+    // Optionally, remove OTP after a delay if OTPs expire (e.g., after 5 minutes)
+    setTimeout(() => this.usedOtps.delete(otp), 5 * 60 * 1000);
+
+    return otp;
+  }
 
   async create(createUserDto: CreateUserDto, user: IUser) {
     const isExist = await this.userModel.findOne({ email: createUserDto.email });
@@ -77,12 +102,17 @@ export class UsersService {
       throw new BadRequestException('Email already exists!');
     }
     createUserDto.password = hashSync(createUserDto.password, genSaltSync(10));
-    return await this.userModel.create({
+    const codeId = this.generateUniqueOtp();
+    const result = await this.userModel.create({
       ...createUserDto,
       role: 'USER',
-      isActive: true,
+      isActive: false,
       avatar: 'avatar-default.png',
+      codeId,
+      codeExpired: dayjs().add(this.configService.get<number>('MAIL_EXPIRED'), 'minutes')
     });
+    this.mailService.sendMail(createUserDto.email, createUserDto.name, codeId);
+    return result;
   }
 
   async findAll(query: string) {
@@ -190,17 +220,14 @@ export class UsersService {
     }
     const user = await this.userModel.findOne({ _id: changeUserDto._id });
     if (user) {
-      const isValid = this.isValidPassword(
-        changeUserDto.oldPassword,
-        user.password,
-      );
+      const isValid = this.isValidPassword(changeUserDto.oldPassword, user.password);
       if (!isValid) {
         throw new BadRequestException('Invalid password!');
       } else {
-        changeUserDto.password = hashSync(changeUserDto.password, genSaltSync(10));
+        changeUserDto.newPassword = hashSync(changeUserDto.newPassword, genSaltSync(10));
         const result = await this.userModel.updateOne(
           { _id: changeUserDto._id },
-          { password: changeUserDto.password },
+          { password: changeUserDto.newPassword },
         );
         if (result.matchedCount === 0) {
           throw new NotFoundException('User not found!');

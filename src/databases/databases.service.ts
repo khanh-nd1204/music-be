@@ -16,7 +16,7 @@ export class DatabasesService implements OnModuleInit {
   async onModuleInit() {
     const isInit = this.configService.get<string>('SHOULD_INIT');
     if (Boolean(isInit)) {
-      const countUser = await this.userModel.count({});
+      const countUser = await this.userModel.countDocuments();
       if (countUser === 0) {
         await this.userModel.insertMany([
           {

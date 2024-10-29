@@ -22,7 +22,7 @@ export class AuthController {
   @Public()
   @UseGuards(LocalAuthGuard)
   @Post('/login')
-  async handleLogin(
+  async login(
     @Req() request: any,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -35,7 +35,7 @@ export class AuthController {
 
   @Public()
   @Post('/register')
-  async handleRegister(@Body() createUserDto: CreateUserDto) {
+  async register(@Body() createUserDto: CreateUserDto) {
     const result = await this.authService.register(createUserDto);
     return {
       data: { _id: result._id, createdAt: result.createdAt },
@@ -44,7 +44,7 @@ export class AuthController {
   }
 
   @Get('/account')
-  async handleGetAccount(@User() user: IUser) {
+  async getAccount(@User() user: IUser) {
     return {
       data: user,
       message: 'Get account successfully',
@@ -53,7 +53,7 @@ export class AuthController {
 
   @Public()
   @Get('/refresh')
-  async handleRefreshToken(
+  async refreshToken(
     @Req() request: Request,
     @Res({ passthrough: true }) response: Response,
   ) {
@@ -69,7 +69,7 @@ export class AuthController {
   }
 
   @Post('/logout')
-  async handleLogout(
+  async logout(
     @User() user: IUser,
     @Res({ passthrough: true }) response: Response,
   ) {

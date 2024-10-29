@@ -26,6 +26,12 @@ export class User {
   @Prop()
   isActive: boolean;
 
+  @Prop()
+  codeId: number;
+
+  @Prop()
+  codeExpired: Date;
+
   @Prop({ type: Object })
   createdBy: {
     _id: string;

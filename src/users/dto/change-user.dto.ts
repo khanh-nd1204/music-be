@@ -12,7 +12,7 @@ export class ChangeUserDto {
   @MinLength(6)
   @IsString()
   @IsNotEmpty()
-  password: string;
+  newPassword: string;
 
   @MinLength(6)
   @IsString()
