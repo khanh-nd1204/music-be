@@ -11,6 +11,9 @@ import { ChangeUserDto } from './dto/change-user.dto';
 import dayjs from 'dayjs';
 import { MailService } from '../mail/mail.service';
 import { ConfigService } from '@nestjs/config';
+import { ActivateUserDto } from './dto/activate-user.dto';
+import { ResetUserDto } from './dto/reset-user.dto';
+import { ResendMailDto } from '../mail/dto/resend-mail.dto';
 
 @Injectable()
 export class UsersService {
@@ -19,24 +22,6 @@ export class UsersService {
     private mailService: MailService,
     private configService: ConfigService,
     ) {}
-
-  private usedOtps = new Set<number>();
-
-  generateUniqueOtp(): number {
-    let otp;
-    do {
-      // Generate a random 6-digit number
-      otp = Math.floor(100000 + Math.random() * 900000);
-    } while (this.usedOtps.has(otp));
-
-    // Store this OTP in the Set
-    this.usedOtps.add(otp);
-
-    // Optionally, remove OTP after a delay if OTPs expire (e.g., after 5 minutes)
-    setTimeout(() => this.usedOtps.delete(otp), 5 * 60 * 1000);
-
-    return otp;
-  }
 
   async create(createUserDto: CreateUserDto, user: IUser) {
     const isExist = await this.userModel.findOne({ email: createUserDto.email });
@@ -102,16 +87,95 @@ export class UsersService {
       throw new BadRequestException('Email already exists!');
     }
     createUserDto.password = hashSync(createUserDto.password, genSaltSync(10));
-    const codeId = this.generateUniqueOtp();
+    const otp = Math.floor(100000 + Math.random() * 900000);
     const result = await this.userModel.create({
       ...createUserDto,
       role: 'USER',
       isActive: false,
       avatar: 'avatar-default.png',
-      codeId,
-      codeExpired: dayjs().add(this.configService.get<number>('MAIL_EXPIRED'), 'minutes')
+      otp: Math.floor(100000 + Math.random() * 900000),
+      otpExpired: dayjs().add(this.configService.get<number>('MAIL_EXPIRED'), 'minutes')
     });
-    this.mailService.sendMail(createUserDto.email, createUserDto.name, codeId);
+    this.mailService.sendMail(createUserDto.email, createUserDto.name, otp, 'activate');
+    return result;
+  }
+
+  async activate(activateUserDto: ActivateUserDto) {
+    const user = await this.userModel.findOne({ email: activateUserDto.email });
+    if (!user) {
+      throw new NotFoundException('User not found!');
+    }
+    if (user.isActive) {
+      throw new BadRequestException('Account has already been activated!');
+    }
+    if (user.otp !== activateUserDto.otp) {
+      throw new BadRequestException('Invalid OTP!');
+    }
+    const activatedAt = new Date();
+    if (activatedAt > user.otpExpired) {
+      throw new BadRequestException('OTP has expired!');
+    }
+
+    const result = await this.userModel.updateOne(
+      { email: activateUserDto.email },
+      { isActive: true, updatedAt: activatedAt }
+    );
+    if (result.modifiedCount === 0) {
+      throw new NotFoundException('Account activation failed!');
+    }
+    return result;
+  }
+
+  async resendMail(resendMailDto: ResendMailDto) {
+    const user = await this.userModel.findOne({ email: resendMailDto.email });
+    if (!user) {
+      throw new BadRequestException('User not found!')
+    }
+
+    if (resendMailDto.type === 'activate' && user.isActive) {
+      throw new BadRequestException('Account has already been activated!');
+    }
+
+    if (resendMailDto.type === 'password' && !user.isActive) {
+      throw new BadRequestException('Account has not been activated!');
+    }
+
+    const otp = Math.floor(100000 + Math.random() * 900000);
+    const result = await this.userModel.updateOne(
+      { email: resendMailDto.email },
+      { otp, otpExpired: dayjs().add(this.configService.get<number>('MAIL_EXPIRED'), 'minutes') },
+    );
+    this.mailService.sendMail(user.email, user.name, otp, resendMailDto.type);
+    return result;
+  }
+
+  async resetPassword(resetUserDto: ResetUserDto) {
+    const user = await this.userModel.findOne({ email: resetUserDto.email });
+    if (!user) {
+      throw new BadRequestException('User not found!')
+    }
+    if (!user.isActive) {
+      throw new BadRequestException('Account has not been activated!');
+    }
+    if (user.otp !== resetUserDto.otp) {
+      throw new BadRequestException('Invalid OTP!');
+    }
+    const updatedAt = new Date();
+    if (updatedAt > user.otpExpired) {
+      throw new BadRequestException('OTP has expired!');
+    }
+
+    resetUserDto.newPassword = hashSync(resetUserDto.newPassword, genSaltSync(10));
+    const result = await this.userModel.updateOne(
+      { email: resetUserDto.email },
+      { password: resetUserDto.newPassword, updatedAt: updatedAt },
+    );
+    if (result.matchedCount === 0) {
+      throw new NotFoundException('User not found!');
+    }
+    if (result.modifiedCount === 0) {
+      throw new NotFoundException('No password were modified!');
+    }
     return result;
   }
 
@@ -182,7 +246,7 @@ export class UsersService {
     return result;
   }
 
-  async remove(id: string, user: IUser) {
+  async remove(id: string) {
     if (!mongoose.Types.ObjectId.isValid(id)) {
       throw new BadRequestException('Invalid user ID!');
     }
@@ -192,16 +256,9 @@ export class UsersService {
       throw new BadRequestException('Cannot delete admin account!');
     }
 
-    const deletedBy = { _id: user._id, email: user.email };
-    const result = await this.userModel.updateOne(
-      { _id: id },
-      { isActive: false, deletedBy, deletedAt: new Date() },
-    );
-    if (result.matchedCount === 0) {
-      throw new NotFoundException('User not found!');
-    }
-    if (result.modifiedCount === 0) {
-      throw new NotFoundException('No user were deleted!');
+    const result = await this.userModel.deleteOne({ _id: id });
+    if (result.deletedCount === 0 || !result.acknowledged) {
+      throw new NotFoundException('User deletion failed!');
     }
     return result;
   }
@@ -227,7 +284,7 @@ export class UsersService {
         changeUserDto.newPassword = hashSync(changeUserDto.newPassword, genSaltSync(10));
         const result = await this.userModel.updateOne(
           { _id: changeUserDto._id },
-          { password: changeUserDto.newPassword },
+          { password: changeUserDto.newPassword, updatedAt: new Date() },
         );
         if (result.matchedCount === 0) {
           throw new NotFoundException('User not found!');

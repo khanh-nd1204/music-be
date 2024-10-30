@@ -4,8 +4,11 @@ import { JwtService } from '@nestjs/jwt';
 import { IUser } from '../users/users.interface';
 import { ConfigService } from '@nestjs/config';
 import ms from 'ms';
-import { Response } from 'express';
+import e, { Response } from 'express';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { ActivateUserDto } from '../users/dto/activate-user.dto';
+import { ResetUserDto } from '../users/dto/reset-user.dto';
+import { ResendMailDto } from '../mail/dto/resend-mail.dto';
 
 @Injectable()
 export class AuthService {
@@ -64,6 +67,18 @@ export class AuthService {
 
   async register(createUserDto: CreateUserDto) {
     return await this.usersService.register(createUserDto);
+  }
+
+  async activate(activateUserDto: ActivateUserDto) {
+    return await this.usersService.activate(activateUserDto);
+  }
+
+  async resendMail(resendMailDto: ResendMailDto) {
+    return await this.usersService.resendMail(resendMailDto);
+  }
+
+  async resetPassword(resetUserDto: ResetUserDto) {
+    return await this.usersService.resetPassword(resetUserDto);
   }
 
   async refreshToken(refreshToken: string, response: Response) {

@@ -27,10 +27,10 @@ export class User {
   isActive: boolean;
 
   @Prop()
-  codeId: number;
+  otp: number;
 
   @Prop()
-  codeExpired: Date;
+  otpExpired: Date;
 
   @Prop({ type: Object })
   createdBy: {
@@ -49,15 +49,6 @@ export class User {
 
   @Prop()
   updatedAt: Date;
-
-  @Prop({ type: Object })
-  deletedBy: {
-    _id: string;
-    email: string;
-  };
-
-  @Prop()
-  deletedAt: Date;
 }
 
 export const UserSchema = SchemaFactory.createForClass(User);

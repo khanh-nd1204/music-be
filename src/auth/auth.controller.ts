@@ -11,9 +11,12 @@ import {
 import { AuthService } from './auth.service';
 import { Public, User } from '../decorator/customize';
 import { LocalAuthGuard } from './guard/local-auth.guard';
-import { Request, response, Response } from 'express';
+import { Request, Response } from 'express';
 import { IUser } from '../users/users.interface';
 import { CreateUserDto } from '../users/dto/create-user.dto';
+import { ActivateUserDto } from '../users/dto/activate-user.dto';
+import { ResetUserDto } from '../users/dto/reset-user.dto';
+import { ResendMailDto } from '../mail/dto/resend-mail.dto';
 
 @Controller('auth')
 export class AuthController {
@@ -41,6 +44,36 @@ export class AuthController {
       data: { _id: result._id, createdAt: result.createdAt },
       message: 'User registered successfully',
     };
+  }
+
+  @Public()
+  @Post('/activate')
+  async activate(@Body() activateUserDto: ActivateUserDto) {
+    const result = await this.authService.activate(activateUserDto);
+    return {
+      data: result,
+      message: 'User activated successfully',
+    }
+  }
+
+  @Public()
+  @Post('/resend-mail')
+  async resendMail(@Body() resendMailDto: ResendMailDto) {
+    const result = await this.authService.resendMail(resendMailDto);
+    return {
+      data: result,
+      message: 'Resend mail successfully',
+    }
+  }
+
+  @Public()
+  @Post('/reset-password')
+  async resetPassword(@Body() resetUserDto: ResetUserDto) {
+    const result = await this.authService.resetPassword(resetUserDto);
+    return {
+      data: result,
+      message: 'User reset password successfully',
+    }
   }
 
   @Get('/account')

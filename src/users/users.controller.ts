@@ -73,8 +73,8 @@ export class UsersController {
 
   @Delete(':id')
   @Roles(Role.Admin)
-  async remove(@Param('id') id: string, @User() user: IUser) {
-    const result = await this.usersService.remove(id, user);
+  async remove(@Param('id') id: string) {
+    const result = await this.usersService.remove(id);
     return {
       data: result,
       message: 'User deleted successfully',

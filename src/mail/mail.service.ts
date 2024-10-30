@@ -5,15 +5,15 @@ import { MailerService } from '@nestjs-modules/mailer';
 export class MailService {
   constructor(private readonly mailerService: MailerService) {}
 
-  public sendMail(email: string, name: string, codeId: number): void {
+  public sendMail(email: string, name: string, otp: number, type: string): void {
     this.mailerService
       .sendMail({
         to: email, // list of receivers
-        subject: 'Activate your account', // Subject line
-        template: 'register.hbs',
+        subject: type === 'activate' ? 'Activate your account' : 'Reset your password', // Subject line
+        template: type === 'activate' ? 'activate.hbs' : 'password.hbs',
         context: {
           name: name,
-          activationCode: codeId
+          activationCode: otp
         }
       })
       .then(() => {})
