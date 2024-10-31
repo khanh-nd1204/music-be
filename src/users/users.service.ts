@@ -93,7 +93,7 @@ export class UsersService {
       role: 'USER',
       isActive: false,
       avatar: 'avatar-default.png',
-      otp: Math.floor(100000 + Math.random() * 900000),
+      otp,
       otpExpired: dayjs().add(this.configService.get<number>('MAIL_EXPIRED'), 'minutes')
     });
     this.mailService.sendMail(createUserDto.email, createUserDto.name, otp, 'activate');
