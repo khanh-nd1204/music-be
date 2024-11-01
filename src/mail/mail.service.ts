@@ -8,8 +8,8 @@ export class MailService {
   public sendMail(email: string, name: string, otp: number, type: string): void {
     this.mailerService
       .sendMail({
-        to: email, // list of receivers
-        subject: type === 'activate' ? 'Activate your account' : 'Reset your password', // Subject line
+        to: email,
+        subject: type === 'activate' ? 'Activate your account' : 'Reset your password',
         template: type === 'activate' ? 'activate.hbs' : 'password.hbs',
         context: {
           name: name,
